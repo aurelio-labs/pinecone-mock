@@ -1,97 +1,39 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"net/http"
-	"strings"
+	"os"
 
-	"github.com/bruvduroiu/pinecone-mock/index"
-	"github.com/bruvduroiu/pinecone-mock/vector"
+	"github.com/bruvduroiu/pinecone-mock/pinecone"
 )
 
 func main() {
 	router := http.NewServeMux()
 
-	indexHandler := index.Handler{}
-	vectorHandler := vector.Handler{
-		Vectors: make(map[string]*vector.Vector),
+	handler := pinecone.Handler{}
+
+	router.HandleFunc("POST /indexes", handler.CreateIndex)
+	router.HandleFunc("GET /indexes", handler.ListIndex)
+	router.HandleFunc("GET /indexes/{index_name}", handler.GetIndexByName)
+	router.HandleFunc("POST /describe_index_stats", handler.DescribeIndexStats)
+	router.HandleFunc("POST /vectors/upsert", handler.UpsertVectors)
+	router.HandleFunc("POST /query", handler.QueryVectors)
+	router.HandleFunc("GET /vectors/fetch", handler.FetchVectors)
+	router.HandleFunc("POST /vectors/update", handler.UpdateVector)
+	router.HandleFunc("POST /vectors/delete", handler.DeleteVector)
+	router.HandleFunc("GET /vectors/list", handler.ListVectorIDs)
+
+	port := os.Getenv("PINECONE_MOCK_PORT")
+	if port == "" {
+		port = "8080"
 	}
-
-	router.HandleFunc("POST /indexes", indexHandler.Create)
-	router.HandleFunc("GET /indexes", indexHandler.List)
-	router.HandleFunc("GET /indexes/{index_name}", indexHandler.GetByName)
-	router.HandleFunc("POST /describe_index_stats", indexHandler.DescribeIndexStats)
-	router.HandleFunc("POST /vectors/upsert", vectorHandler.Upsert)
-	router.HandleFunc("POST /query", vectorHandler.Query)
-	router.HandleFunc("GET /vectors/fetch", vectorHandler.Query)
-
-	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-
-			// Read the request body
-			body, err := io.ReadAll(r.Body)
-			if err != nil {
-				http.Error(w, "Error reading request body", http.StatusInternalServerError)
-				return
-			}
-			defer r.Body.Close()
-
-			// Verify that the body is valid JSON
-			var jsonBody interface{}
-			if err := json.Unmarshal(body, &jsonBody); err != nil {
-				http.Error(w, "Invalid JSON", http.StatusBadRequest)
-				return
-			}
-			log.Println(fmt.Sprintf("%+v", jsonBody))
-
-			// Set the Content-Type header to application/json
-			w.Header().Set("Content-Type", "application/json")
-
-			// Write the JSON back to the response
-			w.WriteHeader(http.StatusOK)
-			w.Write(body)
-		}
-		if r.Method == http.MethodGet {
-			response := make(map[string]interface{})
-
-			// Add query parameters to the response
-			params := r.URL.Query()
-			if len(params) > 0 {
-				response["query_parameters"] = params
-			}
-
-			// Add headers to the response
-			headers := make(map[string]string)
-			for name, values := range r.Header {
-				headers[name] = strings.Join(values, ", ")
-			}
-			response["headers"] = headers
-
-			// Convert the response to JSON
-			jsonResponse, err := json.MarshalIndent(response, "", "  ")
-			if err != nil {
-				http.Error(w, "Error creating JSON response", http.StatusInternalServerError)
-				return
-			}
-			log.Println(fmt.Sprintf("%+v", jsonResponse))
-
-			// Set the Content-Type header to application/json
-			w.Header().Set("Content-Type", "application/json")
-
-			// Write the JSON response
-			w.WriteHeader(http.StatusOK)
-			w.Write(jsonResponse)
-		}
-	})
-
+	addr := fmt.Sprintf("%s:%s", os.Getenv("PINECONE_MOCK_HOST"), port)
 	server := http.Server{
-		Addr:    ":8080",
+		Addr:    addr,
 		Handler: router,
 	}
 
-	fmt.Println("Server listening on port :8080")
+	fmt.Println("Server listening on ", addr)
 	server.ListenAndServe()
 }
