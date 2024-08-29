@@ -8,6 +8,28 @@ Intended to be used for integration tests where it's not suitable to call the Li
 
 No dependencies, just pure Go
 
+## Supports
+
+| Operation | Pinecone Endpoint | Supported |
+| : ------- | : --------------- | : ----- : |
+| Create Index | `POST /indexes`  | **Yes** |
+| List Indexes | `GET /indexes`   | **Yes** |
+| Describe Index | `GET /indexes/{index_name}` | **Yes** |
+| Delete Index | `DELETE /indexes/{index_name}` | No |
+| Configure Index | `PATCH /indexes/{index_name}` | No |
+| Get Index Stats| `GET /describe_index_stats` | **Yes** |
+| Upsert Vectors | `POST /vectors/upsert` | **Yes** |
+| Query Vectors | `POST /query` | **Yes** |
+| Fetch Vectors | `GET /vectors/fetch` | **Yes** |
+| Update Vectors | `POST /vectors/update` | **Yes** |
+| Delete Vectors | `POST /vectors/delete` | **Yes** |
+| List Vectors | `GET /vectors/list` | **Yes** |
+| List Collection | `GET /collections` | No |
+| Create Collection | `POST /collections` | No |
+| Describe Collection | `GET /collections/{collection_name}` | No |
+| Delete Collection | `GET /collections/{collection_name}` | No |
+
+
 # Usage
 
 ```

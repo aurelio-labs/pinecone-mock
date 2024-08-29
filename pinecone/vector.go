@@ -9,7 +9,7 @@ type Vector struct {
 	ID           string         `json:"id"`
 	Values       []float64      `json:"values"`
 	SparseValues *SparseValues  `json:"sparseValues,omitempty"`
-	Metadata     map[string]any `json:"metadata,omitempty"`
+	Metadata     map[string]any `json:"metadata"`
 }
 
 func (v *Vector) Update(updateQuery VectorUpdateQuery) {

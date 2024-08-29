@@ -9,6 +9,8 @@ import (
 
 type Handler struct {
 	Index *Index
+	Host  string
+	Port  string
 }
 
 func (h *Handler) CreateIndex(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +32,7 @@ func (h *Handler) CreateIndex(w http.ResponseWriter, r *http.Request) {
 			State: "Ready",
 		}
 	}
-	index.Host = "http://localhost:8080"
+	index.Host = fmt.Sprintf("http://%s:%s", h.Host, h.Port)
 	index.Namespaces = make(map[string]map[string]*Vector)
 
 	h.Index = &index
@@ -131,10 +133,26 @@ func (h *Handler) QueryVectors(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) FetchVectors(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
+	ids := params["ids"]
+	namespace := params.Get("namespace")
+
+	vectors, err := h.Index.Fetch(namespace, ids)
+	vectorResponse := make(map[string]*Vector, len(vectors))
+
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	for _, vector := range vectors {
+		vectorResponse[vector.ID] = vector
+	}
+
 	json.NewEncoder(w).Encode(map[string]any{
-		"vectors":   []Vector{},
-		"namespace": "not-implemented",
-		"usage":     map[string]int{"readUnits": 1},
+		"vectors":   vectorResponse,
+		"namespace": namespace,
+		"usage":     map[string]int{"readUnits": len(vectors)},
 	})
 }
 
@@ -191,9 +209,11 @@ func (h *Handler) DeleteVector(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListVectorIDs(w http.ResponseWriter, r *http.Request) {
-	namespace := r.URL.Query().Get("namespace")
+	params := r.URL.Query()
+	prefix := params.Get("prefix")
+	namespace := params.Get("namespace")
 
-	vectors, err := h.Index.ListVectorIDs(namespace)
+	vectors, err := h.Index.ListVectorIDs(namespace, prefix)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return

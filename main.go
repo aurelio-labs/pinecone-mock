@@ -11,7 +11,19 @@ import (
 func main() {
 	router := http.NewServeMux()
 
-	handler := pinecone.Handler{}
+	host := os.Getenv("PINECONE_MOCK_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	port := os.Getenv("PINECONE_MOCK_PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	handler := pinecone.Handler{
+		Host: host,
+		Port: port,
+	}
 
 	router.HandleFunc("POST /indexes", handler.CreateIndex)
 	router.HandleFunc("GET /indexes", handler.ListIndex)
@@ -24,11 +36,7 @@ func main() {
 	router.HandleFunc("POST /vectors/delete", handler.DeleteVector)
 	router.HandleFunc("GET /vectors/list", handler.ListVectorIDs)
 
-	port := os.Getenv("PINECONE_MOCK_PORT")
-	if port == "" {
-		port = "8080"
-	}
-	addr := fmt.Sprintf("%s:%s", os.Getenv("PINECONE_MOCK_HOST"), port)
+	addr := fmt.Sprintf("%s:%s", host, port)
 	server := http.Server{
 		Addr:    addr,
 		Handler: router,

@@ -3,6 +3,7 @@ package pinecone
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 type IndexStatus struct {
@@ -67,6 +68,35 @@ func (i *Index) Query(namespace string, topK int) ([]*Vector, error) {
 	return vectors, nil
 }
 
+func (i *Index) Fetch(namespace string, ids []string) ([]*Vector, error) {
+	vectors := make([]*Vector, 0)
+
+	if namespace == "" {
+		for _, ns := range i.Namespaces {
+			for _, id := range ids {
+				vector, exists := ns[id]
+				if exists {
+					vectors = append(vectors, vector)
+				}
+			}
+		}
+	} else {
+		ns, exists := i.Namespaces[namespace]
+		if !exists {
+			return nil, errors.New(fmt.Sprintf("Namespace %s does not exist"))
+		} else {
+			for _, id := range ids {
+				vector, exists := ns[id]
+				if exists {
+					vectors = append(vectors, vector)
+				}
+			}
+		}
+	}
+
+	return vectors, nil
+}
+
 func (i *Index) GetVector(namespace string, id string) (*Vector, error) {
 	ns, exists := i.Namespaces[namespace]
 	if !exists {
@@ -104,23 +134,28 @@ func (i *Index) DeleteVector(vectorDelete VectorDeleteQuery) {
 	}
 }
 
-func (i *Index) ListVectorIDs(namespace string) ([]map[string]string, error) {
+func (i *Index) ListVectorIDs(namespace string, prefix string) ([]map[string]string, error) {
 	vectors := make([]map[string]string, 0)
+
 	if namespace != "" {
 		ns, exists := i.Namespaces[namespace]
 		if !exists {
 			return nil, errors.New(fmt.Sprintf("Namespace %s does not exist"))
 		}
 		for id, _ := range ns {
-			vectors = append(vectors, map[string]string{"id": id})
-		}
-
-	} else {
-		for _, ns := range i.Namespaces {
-			for id, _ := range ns {
+			if strings.HasPrefix(id, prefix) {
 				vectors = append(vectors, map[string]string{"id": id})
 			}
 		}
+	} else {
+		for _, ns := range i.Namespaces {
+			for id, _ := range ns {
+				if strings.HasPrefix(id, prefix) {
+					vectors = append(vectors, map[string]string{"id": id})
+				}
+			}
+		}
+
 	}
 
 	return vectors, nil
