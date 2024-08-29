@@ -11,7 +11,7 @@ No dependencies, just pure Go
 ## Supports
 
 | Operation | Pinecone Endpoint | Supported |
-| : ------- | : --------------- | : ----- : |
+| --------- | ----------------- | --------- |
 | Create Index | `POST /indexes`  | **Yes** |
 | List Indexes | `GET /indexes`   | **Yes** |
 | Describe Index | `GET /indexes/{index_name}` | **Yes** |
