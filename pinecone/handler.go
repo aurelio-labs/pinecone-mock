@@ -90,9 +90,9 @@ func (h *Handler) UpsertVectors(w http.ResponseWriter, r *http.Request) {
 
 	for _, vector := range vectorUpsertBody.Vectors {
 		if h.Index.Namespaces[vectorUpsertBody.Namespace] == nil {
-			h.Index.Namespaces[vectorUpsertBody.Namespace] = make(map[string]*Vector)
+			h.Index.CreateNamespace(vectorUpsertBody.Namespace)
 		}
-		h.Index.Namespaces[vectorUpsertBody.Namespace][vector.ID] = &vector
+		h.Index.UpsertVector(vectorUpsertBody.Namespace, &vector)
 	}
 
 	log.Println(fmt.Sprintf("%+v", vectorUpsertBody))
@@ -107,47 +107,26 @@ func (h *Handler) QueryVectors(w http.ResponseWriter, r *http.Request) {
 	var vectorQueryQuery VectorQueryQuery
 	err := decoder.Decode(&vectorQueryQuery)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Error reading request body %+v", r.Body), http.StatusInternalServerError)
 		return
 	}
 
-	var vectors []Vector
-	remainingTopK := vectorQueryQuery.TopK
-	if vectorQueryQuery.Namespace != "" {
-		for _, vector := range h.Index.Namespaces[vectorQueryQuery.Namespace] {
-			if remainingTopK > 0 {
-				vectors = append(vectors, *vector)
-				remainingTopK--
-			} else {
-				break
-			}
-		}
-	} else {
-		for _, ns := range h.Index.Namespaces {
-			for _, vector := range ns {
-				if remainingTopK > 0 {
-					vectors = append(vectors, *vector)
-					remainingTopK--
-				} else {
-					break
-				}
-
-			}
-		}
-	}
-
 	var vectorsResult []VectorResult
+	vectors, err := h.Index.Query(vectorQueryQuery.Namespace, vectorQueryQuery.TopK)
 	for _, value := range vectors {
 		vectorsResult = append(vectorsResult, VectorResult{
-			ID:     value.ID,
-			Score:  0,
-			Values: value.Values,
+			ID:       value.ID,
+			Score:    0.9,
+			Values:   value.Values,
+			Metadata: value.Metadata,
 		})
 	}
 	response := make(map[string]any)
-	response["matches"] = vectors
+	response["matches"] = vectorsResult
 	response["namespace"] = vectorQueryQuery.Namespace
 	response["usage"] = map[string]int{"read_units": len(vectors)}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -170,23 +149,14 @@ func (h *Handler) UpdateVector(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vector, exists := h.Index.Namespaces[vectorUpdate.Namespace][vectorUpdate.ID]
-	if !exists {
+	vector, err := h.Index.GetVector(vectorUpdate.Namespace, vectorUpdate.ID)
+
+	if vector == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	if vectorUpdate.Values != nil {
-		vector.Values = vectorUpdate.Values
-	}
-
-	if vectorUpdate.SetMetadata != nil {
-		for k, v := range vectorUpdate.SetMetadata {
-			vector.Metadata[k] = v
-		}
-	}
-
-	h.Index.Namespaces[vectorUpdate.Namespace][vectorUpdate.ID] = vector
+	vector.Update(vectorUpdate)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -207,30 +177,11 @@ func (h *Handler) DeleteVector(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if vectorDelete.Namespace != "" {
-		if (vectorDelete.IDs == nil) && (!vectorDelete.DeleteAll) {
-			http.Error(w, "Bad request", http.StatusBadRequest)
-		} else if vectorDelete.DeleteAll {
-			h.Index.Namespaces = make(map[string]map[string]*Vector)
-		} else {
-			for _, ns := range h.Index.Namespaces {
-				for _, id := range vectorDelete.IDs {
-					delete(ns, id)
-				}
-			}
-		}
-	} else {
-		if (vectorDelete.IDs == nil) && (!vectorDelete.DeleteAll) {
-			http.Error(w, "Bad request", http.StatusBadRequest)
-		}
-		if vectorDelete.DeleteAll {
-			h.Index.Namespaces[vectorDelete.Namespace] = make(map[string]*Vector)
-		} else {
-			for _, id := range vectorDelete.IDs {
-				delete(h.Index.Namespaces[vectorDelete.Namespace], id)
-			}
-		}
+	if (vectorDelete.IDs == nil) && (!vectorDelete.DeleteAll) {
+		http.Error(w, "Bad request", http.StatusBadRequest)
 	}
+
+	h.Index.DeleteVector(vectorDelete)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -240,13 +191,14 @@ func (h *Handler) DeleteVector(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListVectorIDs(w http.ResponseWriter, r *http.Request) {
-
 	namespace := r.URL.Query().Get("namespace")
 
-	vectors := make([]map[string]string, 0)
-	for id, _ := range h.Index.Namespaces[namespace] {
-		vectors = append(vectors, map[string]string{"id": id})
+	vectors, err := h.Index.ListVectorIDs(namespace)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
 	}
+
 	response := make(map[string]any)
 	response["vectors"] = vectors
 	response["namespace"] = namespace
