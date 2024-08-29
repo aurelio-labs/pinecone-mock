@@ -32,7 +32,7 @@ func (h *Handler) CreateIndex(w http.ResponseWriter, r *http.Request) {
 			State: "Ready",
 		}
 	}
-	index.Host = fmt.Sprintf("http://%s:%s", h.Host, h.Port)
+	index.Host = r.Host
 	index.Namespaces = make(map[string]map[string]*Vector)
 
 	h.Index = &index
