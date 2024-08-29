@@ -1,8 +1,6 @@
 package pinecone
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -26,16 +24,14 @@ func (i *Index) CreateNamespace(name string) {
 	i.Namespaces[name] = make(map[string]*Vector)
 }
 
-func (i *Index) UpsertVector(namespace string, vector *Vector) error {
+func (i *Index) UpsertVector(namespace string, vector *Vector) {
 	ns, exists := i.Namespaces[namespace]
-	var err error
 	if !exists {
-		err = errors.New(fmt.Sprintf("Namespace not found: %s", namespace))
+		ns = map[string]*Vector{vector.ID: vector}
 	} else {
 		ns[vector.ID] = vector
 	}
-
-	return err
+	i.Namespaces[namespace] = ns
 }
 
 func (i *Index) Query(namespace string, topK int) ([]*Vector, error) {
@@ -68,7 +64,7 @@ func (i *Index) Query(namespace string, topK int) ([]*Vector, error) {
 	return vectors, nil
 }
 
-func (i *Index) Fetch(namespace string, ids []string) ([]*Vector, error) {
+func (i *Index) Fetch(namespace string, ids []string) []*Vector {
 	vectors := make([]*Vector, 0)
 
 	if namespace == "" {
@@ -83,7 +79,7 @@ func (i *Index) Fetch(namespace string, ids []string) ([]*Vector, error) {
 	} else {
 		ns, exists := i.Namespaces[namespace]
 		if !exists {
-			return nil, errors.New(fmt.Sprintf("Namespace %s does not exist"))
+			return vectors
 		} else {
 			for _, id := range ids {
 				vector, exists := ns[id]
@@ -94,22 +90,17 @@ func (i *Index) Fetch(namespace string, ids []string) ([]*Vector, error) {
 		}
 	}
 
-	return vectors, nil
+	return vectors
 }
 
-func (i *Index) GetVector(namespace string, id string) (*Vector, error) {
+func (i *Index) GetVector(namespace string, id string) *Vector {
 	ns, exists := i.Namespaces[namespace]
 	if !exists {
-		err := errors.New(fmt.Sprintf("Namespace not found: %s", namespace))
-		return nil, err
+		return &Vector{}
 	}
 	vector, exists := ns[id]
-	if !exists {
-		return nil, nil
-	}
 
-	return vector, nil
-
+	return vector
 }
 
 func (i *Index) DeleteVector(vectorDelete VectorDeleteQuery) {
@@ -134,13 +125,13 @@ func (i *Index) DeleteVector(vectorDelete VectorDeleteQuery) {
 	}
 }
 
-func (i *Index) ListVectorIDs(namespace string, prefix string) ([]map[string]string, error) {
+func (i *Index) ListVectorIDs(namespace string, prefix string) []map[string]string {
 	vectors := make([]map[string]string, 0)
 
 	if namespace != "" {
 		ns, exists := i.Namespaces[namespace]
 		if !exists {
-			return nil, errors.New(fmt.Sprintf("Namespace %s does not exist"))
+			return vectors
 		}
 		for id, _ := range ns {
 			if strings.HasPrefix(id, prefix) {
@@ -158,5 +149,5 @@ func (i *Index) ListVectorIDs(namespace string, prefix string) ([]map[string]str
 
 	}
 
-	return vectors, nil
+	return vectors
 }

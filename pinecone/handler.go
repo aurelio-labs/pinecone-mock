@@ -137,13 +137,8 @@ func (h *Handler) FetchVectors(w http.ResponseWriter, r *http.Request) {
 	ids := params["ids"]
 	namespace := params.Get("namespace")
 
-	vectors, err := h.Index.Fetch(namespace, ids)
+	vectors := h.Index.Fetch(namespace, ids)
 	vectorResponse := make(map[string]*Vector, len(vectors))
-
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
 
 	for _, vector := range vectors {
 		vectorResponse[vector.ID] = vector
@@ -167,7 +162,7 @@ func (h *Handler) UpdateVector(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vector, err := h.Index.GetVector(vectorUpdate.Namespace, vectorUpdate.ID)
+	vector := h.Index.GetVector(vectorUpdate.Namespace, vectorUpdate.ID)
 
 	if vector == nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -213,11 +208,7 @@ func (h *Handler) ListVectorIDs(w http.ResponseWriter, r *http.Request) {
 	prefix := params.Get("prefix")
 	namespace := params.Get("namespace")
 
-	vectors, err := h.Index.ListVectorIDs(namespace, prefix)
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
+	vectors := h.Index.ListVectorIDs(namespace, prefix)
 
 	response := make(map[string]any)
 	response["vectors"] = vectors
