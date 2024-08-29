@@ -13,7 +13,7 @@ type IndexStatus struct {
 
 type Index struct {
 	Name      string      `json:"name"`
-	Dimension int64       `json:"dimension"`
+	Dimension int         `json:"dimension"`
 	Metric    string      `json:"metric"`
 	Status    IndexStatus `json:"status"`
 	Host      string      `json:"host"`
